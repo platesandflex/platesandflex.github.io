@@ -799,9 +799,10 @@ function todayDay(){return DAYS[(new Date().getDay()+6)%7]}
 function fmt(s){s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
 function wfmt(w){return (Math.round(w*10)/10).toString()}
 let toastT;function toast(t){const e=$('#toast');e.textContent=t;e.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>e.style.opacity=0,Math.min(5000,1800+t.length*25))}
-function maxHR(p){return Math.round(208-.7*p.age)}
+function ownMax(p){const m=Math.round(+p.mhr||0);return m>=100&&m<=220?m:0}
+function maxHR(p){return ownMax(p)||Math.round(208-.7*p.age)}
 function restHR(p){return +p.rest||0}
-function bpm(p,pct){const mx=maxHR(p),r=restHR(p);return Math.round(r?r+pct*(mx-r):pct*mx)}
+function bpm(p,pct){return Math.round(pct*maxHR(p))}
 function zoneFor(p){
   const g=GOALS[p.goal];let [lo,hi]=g.zone;
   if(p.current<=1||p.age>=60){hi=Math.min(hi,.7);lo=Math.min(lo,.6)}
@@ -5963,9 +5964,10 @@ function renderMe(){
     <div class="summary"><div class="pair">${bodyImg('now',p.current,p.fem)}<span class="arrow">→</span>${bodyImg('goal',p.goal,p.fem)}</div>
       <div style="min-width:0;flex:1"><div class="eyebrow">Now</div><div style="font-weight:600">${CURRENT[p.current].name}</div><div class="eyebrow" style="margin-top:8px">Goal</div><div style="font-weight:600;color:var(--goal)">${GOALS[p.goal].name}</div></div></div>
     <div class="card"><h3>Heart rate</h3>
-      <p class="how">Estimated max: <b class="num" style="font-size:18px">${mx} bpm</b> (208 − 0.7 × age${restHR(p)?`; zones use your resting ${restHR(p)} bpm`:''}). Your cardio target is <b style="color:var(--bad)">${bpm(p,z[0])}–${bpm(p,z[1])} bpm</b>${p.current<=1||p.age>=60?', kept on the gentle side for now':''}.</p>
+      <p class="how">${ownMax(p)?'Your max':'Estimated max'}: <b class="num" style="font-size:18px">${mx} bpm</b> (${ownMax(p)?'the highest you told us you\'ve hit':'208 − 0.7 × age'}). Your cardio target is <b style="color:var(--bad)">${bpm(p,z[0])}–${bpm(p,z[1])} bpm</b>${p.current<=1||p.age>=60?', kept on the gentle side for now':''}.</p>
       <div style="overflow-x:auto"><table class="z"><tr><th>Zone</th><th>% of max</th><th>Your bpm</th></tr>
       ${rows.map(r=>`<tr><td>${r[0]}</td><td>${r[1]*100}–${r[2]*100}%</td><td class="n">${bpm(p,r[1])}–${bpm(p,r[2])}</td></tr>`).join('')}</table></div>
+      ${ownMax(p)?'':'<p class="how muted" style="font-size:13px">Can\'t get near these numbers even when you\'re out of breath? The age estimate can be 10 or more beats off. Tap Redo setup below and enter the highest heart rate you\'ve actually hit, and every target adjusts. Never push harder just to reach a number.</p>'}
       <p class="how muted" style="font-size:13px">These are estimates. Stop and get help for chest pain, dizziness or unusual shortness of breath. If you take heart or blood-pressure medication (beta blockers especially), or have a heart condition, ask your doctor for your own numbers.</p></div>
     ${coachCardMe(p)}
     ${planCardMe()}
@@ -6189,7 +6191,7 @@ function renderOnboard(){
         <div class="field"><label for="f-sex">Sex (for calorie math)</label><select id="f-sex" data-f="sex"><option value="m" ${d.sex!=='f'?'selected':''}>Male</option><option value="f" ${d.sex==='f'?'selected':''}>Female</option></select></div>
         <div class="field"><label for="f-hf">Height (ft)</label><input id="f-hf" inputmode="numeric" data-f="hFt" value="${d.hFt||''}" placeholder="5"></div>
         <div class="field"><label for="f-hi">Height (in)</label><input id="f-hi" inputmode="numeric" data-f="hIn" value="${d.hIn||''}" placeholder="10"></div>
-        <div class="field"><label for="f-rhr">Resting heart rate (optional)</label><input id="f-rhr" inputmode="numeric" data-f="rest" value="${d.rest||''}" placeholder="e.g. 68"><small class="muted">Sitting still, right after you wake up. Usually 50–100.</small></div>
+        <div class="field"><label for="f-mhr">Highest heart rate you've hit (optional)</label><input id="f-mhr" inputmode="numeric" data-f="mhr" value="${d.mhr||''}" placeholder="e.g. 165"><small class="muted">The top number your watch or the machine showed when you were going all out. Leave blank and we estimate it from your age.</small></div>
         <div class="field"><label for="f-fig">Body pictures shown as</label><select id="f-fig" data-f="fem"><option value="0" ${!d.fem?'selected':''}>Male</option><option value="1" ${d.fem?'selected':''}>Female</option></select></div>
       </div>`;
   }else if(st===1||st===2){
@@ -6729,7 +6731,7 @@ document.addEventListener('click',e=>{
     case 'obnext':
       if(S.ui.daysOnly){S.ui.daysOnly=false;S.ui.savingDays=true;S.ui.step=6}
       if(S.ui.step<6){S.ui.step++;if(S.ui.step===4&&!d.goalWset)d.goalW=suggestGoalW(Object.assign({},d,{goalW:0}));render();$('.floor').scrollTop=0}
-      else{const p=Object.assign({},d);p.age=+p.age;p.weight=+p.weight;p.rest=+p.rest||0;p.fem=!!p.fem;p.music=p.music||'spotify';
+      else{const p=Object.assign({},d);p.age=+p.age;p.weight=+p.weight;p.rest=+p.rest||0;p.mhr=(m=>m>=100&&m<=220?m:0)(Math.round(+p.mhr||0));p.fem=!!p.fem;p.music=p.music||'spotify';
         p.goalW=clampGoalW(p,+p.goalW||suggestGoalW(p));
         {const c=fastCfg(p);p.fastOn=c.on;p.fastType=c.type;p.fastWin=c.win;p.fastWeekdays=c.wd;p.fastDates=c.dates.filter(x=>x>=todayKey());delete p.fast;delete p.fastDays}
         if(p.ed)p.hideCal=true;p.v=2;
