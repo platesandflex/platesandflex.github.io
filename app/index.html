@@ -756,6 +756,40 @@ async function initDb(){
   }catch(e){}
 }
 
+/* ================= backup / restore (a copyable code; nothing leaves the phone unless the user sends it) ================= */
+const BK_PRE='PFB1:';
+async function bkEncode(o){const txt=JSON.stringify(o);
+  try{if(window.CompressionStream){const cs=new Blob([txt]).stream().pipeThrough(new CompressionStream('gzip'));const buf=new Uint8Array(await new Response(cs).arrayBuffer());let b='';for(let i=0;i<buf.length;i+=8192)b+=String.fromCharCode.apply(null,buf.subarray(i,i+8192));return BK_PRE+'z'+btoa(b)}}catch(_){}
+  return BK_PRE+'j'+btoa(unescape(encodeURIComponent(txt)))}
+async function bkDecode(code){code=(code||'').replace(/\s+/g,'');if(!code.startsWith(BK_PRE))throw new Error('bad');const kind=code[BK_PRE.length],data=code.slice(BK_PRE.length+1);
+  if(kind==='j')return JSON.parse(decodeURIComponent(escape(atob(data))));
+  const bin=atob(data);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);
+  const ds=new Blob([u]).stream().pipeThrough(new DecompressionStream('gzip'));return JSON.parse(await new Response(ds).text())}
+function copyText(t){const done=()=>toast('Backup code copied');
+  try{if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t).then(done,()=>fallback());return}}catch(_){}fallback();
+  function fallback(){const a=$('#bkcode');if(a){a.removeAttribute('readonly');a.select();a.setSelectionRange(0,t.length)}let ok=false;try{ok=document.execCommand('copy')}catch(_){}if(a)a.setAttribute('readonly','');ok?done():toast('Press and hold the code, then Select all and Copy')}}
+async function openBackup(){closeOv();const code=await bkEncode({v:1,at:Date.now(),profile:S.profile,logs:S.logs,food:S.food,wt:S.wt});
+  const ov=document.createElement('div');ov.id='ov';ov.className='ov';
+  ov.innerHTML=`<div class="ovbar gut"><strong style="font-family:var(--display);font-size:20px">Back up your plan</strong><button class="btn" data-act="ovclose">Close</button></div>
+   <div class="ovbody gut" style="justify-content:flex-start;align-items:stretch;max-width:560px;margin:0 auto;width:100%">
+    <p class="lede" style="margin:0">This code holds your profile, plan, workout history, meals and weigh-ins. Copy it and keep it somewhere safe: email it to yourself or paste it into your notes.</p>
+    <textarea id="bkcode" readonly style="width:100%;min-height:140px;font:12px ui-monospace,monospace;border-radius:12px;padding:10px;word-break:break-all">${code}</textarea>
+    <div class="wrow" style="gap:8px"><button class="btn primary" data-act="bkcopy">Copy code</button></div>
+    <p class="muted" style="font-size:13px">To move to a new phone, or after clearing the app, tap <b>Restore</b> in Settings and paste the code. Your gym QR screenshot isn't included; add it again after restoring.</p>
+   </div>`;document.body.appendChild(ov)}
+function openRestore(){closeOv();const ov=document.createElement('div');ov.id='ov';ov.className='ov';
+  ov.innerHTML=`<div class="ovbar gut"><strong style="font-family:var(--display);font-size:20px">Restore a backup</strong><button class="btn" data-act="ovclose">Close</button></div>
+   <div class="ovbody gut" style="justify-content:flex-start;align-items:stretch;max-width:560px;margin:0 auto;width:100%">
+    <p class="lede" style="margin:0">Paste your backup code. This replaces the profile, plan and history on this phone.</p>
+    <textarea id="rscode" placeholder="PFB1:..." style="width:100%;min-height:140px;font:12px ui-monospace,monospace;border-radius:12px;padding:10px;word-break:break-all"></textarea>
+    <div class="wrow" style="gap:8px"><button class="btn primary" data-act="restore2">Restore</button></div>
+   </div>`;document.body.appendChild(ov)}
+async function doRestore(){let o;try{o=await bkDecode($('#rscode').value)}catch(_){toast("That doesn't look like a Plates & Flex backup code");return}
+  if(!o||!o.profile){toast("That backup doesn't have a profile in it");return}
+  const now=Date.now();S.profile=o.profile;S.logs=o.logs||{};S.food=o.food||{};S.wt=o.wt||[];
+  for(const k of ['profile','logs','food','wt'])T[k]=now;lsPut();if(store.db)for(const k of ['profile','logs','food','wt'])flush(k);
+  S.ui.draft=null;closeOv();render();toast('Backup restored')}
+
 /* ================= helpers ================= */
 const $=s=>document.querySelector(s);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -5942,7 +5976,7 @@ function renderMe(){
       ${isHome(p)?'':`<div class="eyebrow" style="margin-top:6px">Equipment</div><div class="seg" style="align-self:flex-start;margin:4px 0">${LIFT_OPTS.map(o=>`<button data-act="lift" data-v="${o[0]}" class="${liftOf(p)===o[0]?'on':''}">${o[1]}</button>`).join('')}</div>
       <p class="how muted" style="font-size:13px;margin:0 0 8px">${LIFT_WHY[liftOf(p)]}</p>`}${Object.keys(p.swaps||{}).length?`<p class="how">${Object.keys(p.swaps).length} exercise swap${Object.keys(p.swaps).length>1?'s':''} saved. <button class="linkbtn" data-act="clearswaps">Reset swaps</button></p>`:''}<div><button class="btn" data-act="redo">Change gym or home</button></div></div>
     <div class="card"><h3>Settings</h3>
-      <div class="chips"><button class="btn" data-act="tourstart">Take the tour</button><button class="btn" data-act="redo">Redo setup</button>
+      <div class="chips"><button class="btn" data-act="tourstart">Take the tour</button><button class="btn" data-act="backup">Back up</button><button class="btn" data-act="restore1">Restore</button><button class="btn" data-act="redo">Redo setup</button>
       ${S.ui.confirmReset?`<span class="confirm"><span class="muted">Erase all logged sets?</span><button class="btn" style="border-color:var(--bad);color:var(--bad)" data-act="reset2">Erase history</button><button class="btn ghost" data-act="reset0">Cancel</button></span>`:`<button class="btn ghost" data-act="reset1">Clear workout history</button>`}</div></div>`;
 }
 
@@ -6148,7 +6182,7 @@ function renderOnboard(){
   if(st===0){
     ok=d.age>=13&&d.age<=95&&d.weight>=70&&+d.hFt>=3;
     inner=`<div class="eyebrow">Step 1 of 7</div><h1>${S.ui.upgrade?'New: meal plans and a goal date':'Let\'s build your gym plan'}</h1>
-      <p class="lede">${S.ui.upgrade?'A few more questions so Plates &amp; Flex can build your meals and estimate when you\'ll reach your goal. Your workout history is kept.':'A few numbers first. Age sets your safe heart-rate targets; weight and height set your calories and safe pace.'} ${NATIVE?'Everything stays on this phone.':'Everything stays in your own account.'}</p>
+      <p class="lede">${S.ui.upgrade?'A few more questions so Plates &amp; Flex can build your meals and estimate when you\'ll reach your goal. Your workout history is kept.':'A few numbers first. Age sets your safe heart-rate targets; weight and height set your calories and safe pace.'} ${NATIVE||WEBSITE?'Everything stays on this phone.':'Everything stays in your own account.'}</p>
       <div class="form">
         <div class="field"><label for="f-age">Age</label><input id="f-age" inputmode="numeric" data-f="age" value="${d.age}" placeholder="32"></div>
         <div class="field"><label for="f-wt">Weight (lb)</label><input id="f-wt" inputmode="decimal" data-f="weight" value="${d.weight}" placeholder="210"></div>
@@ -6578,6 +6612,10 @@ document.addEventListener('click',e=>{
     case 'redo':S.ui.draft=newDraft();S.ui.step=0;render();break;
     case 'reset1':S.ui.confirmReset=true;render();break;
     case 'reset0':S.ui.confirmReset=false;render();break;
+    case 'backup':openBackup();break;
+    case 'restore1':openRestore();break;
+    case 'bkcopy':copyText($('#bkcode').value);break;
+    case 'restore2':doRestore();break;
     case 'reset2':S.logs={};S.ui.confirmReset=false;save('logs',true);toast('History cleared');render();break;
     case 'pickcur':d.current=+v;render();break;
     case 'pickgoal':d.goal=+v;d.goalWset=false;render();break;
