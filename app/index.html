@@ -977,6 +977,9 @@ function curWeight(it){const e=peekToday(it.id);if(e&&e.w!=null)return e.w;const
 const TM={dur:60,left:60,run:false,end:0,done:false};
 let actx=null;
 function beep(){if(nativeTimers())return;try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();[0,.22,.44].forEach(t=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.25,actx.currentTime+t);g.gain.exponentialRampToValueAtTime(.001,actx.currentTime+t+.18);o.start(actx.currentTime+t);o.stop(actx.currentTime+t+.2)})}catch(e){}try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}}
+/* one soft chime: a guided stretch is switching. On Android it plays over the music; elsewhere a single tone. */
+function ding(){try{if(window.Native&&Native.chimeOne){Native.chimeOne();return}}catch(_){}
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();const t=actx.currentTime,o=actx.createOscillator(),g=actx.createGain();o.frequency.value=880;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(.25,t);g.gain.exponentialRampToValueAtTime(.001,t+.6);o.start(t);o.stop(t+.62)}catch(e){}}
 function tStart(){if(TM.left<=0)TM.left=TM.dur;TM.end=Date.now()+TM.left*1000;TM.run=true;TM.done=false;drawTimer()}
 function tStop(){if(TM.run){TM.left=Math.max(0,(TM.end-Date.now())/1000);TM.run=false}drawTimer()}
 function tReset(){TM.run=false;TM.left=TM.dur;TM.done=false;drawTimer()}
@@ -5921,10 +5924,10 @@ function stretchBlock(it){const L=stretchFor(it);if(!L.length)return '';const g=
    ${g?`<div class="strnow"><span class="muted">${g.k+1} of ${L.length}</span><b>${esc(L[g.k][0])}</b><p>${esc(L[g.k][1])}</p><span class="clock num" id="strclock">${fmt(Math.max(0,Math.ceil((g.end-Date.now())/1000)))}</span>
      <div class="row"><button class="btn" data-act="strnext" data-id="${it.id}">${g.k+1<L.length?'Next stretch':'Finish'}</button><button class="linkbtn" data-act="strstop">Stop</button></div></div>`
    :`<ol class="strlist">${L.map(x=>`<li><b>${esc(x[0])}</b> · 30 s</li>`).join('')}</ol><button class="btn sm" data-act="strgo" data-id="${it.id}">Guide me through it</button>`}
-   <p class="muted" style="font-size:12px;margin:6px 0 0">Gentle, no bouncing. Ease off if anything pinches.</p></div>`}
+   <p class="muted" style="font-size:12px;margin:6px 0 0">One chime means switch to the next stretch. Gentle, no bouncing. Ease off if anything pinches.</p></div>`}
 function strTick(){const g=S.ui.str;if(!g){clearInterval(strT);strT=null;return}
   const left=Math.max(0,Math.ceil((g.end-Date.now())/1000));const c=$('#strclock');if(c)c.textContent=fmt(left);
-  if(left<=0&&!g.beeped){g.beeped=true;try{navigator.vibrate&&navigator.vibrate(200)}catch(_){}
+  if(left<=0&&!g.beeped){g.beeped=true;ding();try{navigator.vibrate&&navigator.vibrate(200)}catch(_){}
     const it=findItem(g.id);const L=it?stretchFor(it):[];if(g.k+1<L.length){g.k++;g.end=Date.now()+30000;g.beeped=false;render()}else{S.ui.str=null;toast('Stretches done. Nice.');render()}}}
 function strStart(id,k){S.ui.str={id,k,end:Date.now()+30000};clearInterval(strT);strT=setInterval(strTick,500);render()}
 function timedCard(it,i){
