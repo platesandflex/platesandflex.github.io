@@ -4336,19 +4336,20 @@ function planStart(p){return p.start||todayKey()}
 function monthOf(p,dk){return Math.floor(daysBetween(planStart(p),dk)/planLen(p))}
 function isFastDay(p,dk){const c=fastCfg(p);return c.on&&(c.wd.includes(dayNameOf(dk))||c.dates.includes(dk))}
 function mealMode(p){return p&&(p.mealMode==='days'||p.mealMode==='none')?p.mealMode:'full'}
-function mealOff(p,dk){const m=mealMode(p);return m==='none'||(m==='days'&&!(p.mealWd||[]).includes(dayNameOf(dk)))}
+function mealWdOf(p){return p.mealBy==='gym'?DAYS.filter(d=>+((p.days||{})[d])>0):(p.mealWd||[])}
+function mealOff(p,dk){const m=mealMode(p);return m==='none'||(m==='days'&&!mealWdOf(p).includes(dayNameOf(dk)))}
 const PICK_SLOT={b:['b','Breakfast',.25,''],l:['l','Lunch',.30,''],d:['d','Dinner',.35,''],s:['s','Snack',.10,''],x:['x','Drink',.07,'']};
 function rxById(p,slot,dk,id){return dietPool(p,slot,dk).find(r=>String(r.id)===String(id))||null}
 function picksFor(p,G,dk){const f=S.food[dk];if(!f||!f.pk||!f.pk.length)return [];const kc=dayKcal(p,G,dk)||G.kcal||2000;
   return f.pk.map((x,i)=>{const rx=rxById(p,x.s,dk,x.id);if(!rx)return null;const sl=PICK_SLOT[x.s]||PICK_SLOT.s;
     const m=mk([sl[0],sl[1]+' · your pick',sl[2],''],rx,clamp(kc*sl[2]/rx.k,.5,2.2),'k:'+x.t+':'+rx.id);m.pick=i;return m}).filter(Boolean)}
-function mealModeHtml(t,setup){const m=mealMode(t);const wd=t.mealWd||[];const work=!!t.mealWork;
+function mealModeHtml(t,setup){const m=mealMode(t);const wd=mealWdOf(t);const gym=m==='days'&&t.mealBy==='gym';const work=m==='days'&&!gym&&!!t.mealWork;
   const opt=(v,ttl,sub)=>`<button class="mmopt ${m===v?'on':''}" data-act="mealmode" data-v="${v}" aria-pressed="${m===v}"><b>${ttl}</b><span>${sub}</span></button>`;
   return `<div class="eyebrow" style="margin-top:6px">${setup?'How do you want to handle food?':'Meal plan style'}</div>
    <div class="mmopts">${opt('full','Meal plan','A recipe for every meal, with shopping trips to match.')}${opt('days','Customize','You choose which days get recipes. The other days you eat your own way.')}${opt('none','Go with the flow','No set plan. Pick a recipe whenever you want one.')}</div>
-   ${m==='none'?'':`<div class="eyebrow" style="margin-top:8px">Only want a food plan on your workdays?</div>
-   <div class="seg" style="align-self:flex-start"><button data-act="mealwork" data-v="0" class="${m==='days'&&work?'':'on'}">No</button><button data-act="mealwork" data-v="1" class="${m==='days'&&work?'on':''}">Yes, workdays only</button></div>`}
-   ${m==='days'?`<div class="eyebrow" style="margin-top:8px">${work?'Which days do you work?':'Which days do you want recipes?'}</div><div class="chips">${DAYS.map(d=>`<button class="chip ${wd.includes(d)?'on':''}" data-act="mealwd" data-v="${d}" aria-pressed="${wd.includes(d)}">${DAYS3[d]}</button>`).join('')}</div><p class="how muted" style="font-size:13px;margin:4px 0 0">Recipes and groceries are planned only for these days.</p>`:''}
+   ${m==='none'?'':`<div class="eyebrow" style="margin-top:8px">Only want a food plan on certain days?</div>
+   <div class="seg" style="align-self:flex-start;flex-wrap:wrap"><button data-act="mealwork" data-v="0" class="${gym||work?'':'on'}">${m==='days'?'My own days':'No, every day'}</button><button data-act="mealwork" data-v="2" class="${gym?'on':''}">Workout days</button><button data-act="mealwork" data-v="1" class="${work?'on':''}">Workdays</button></div>`}
+   ${m==='days'?`<div class="eyebrow" style="margin-top:8px">${gym?'Your workout days':work?'Which days do you work?':'Which days do you want recipes?'}</div><div class="chips">${DAYS.map(d=>`<button class="chip ${wd.includes(d)?'on':''}" data-act="mealwd" data-v="${d}" aria-pressed="${wd.includes(d)}">${DAYS3[d]}</button>`).join('')}</div><p class="how muted" style="font-size:13px;margin:4px 0 0">${gym?'Recipes and groceries follow your workout schedule, and update if you change it. Tap a day to set your own instead.':'Recipes and groceries are planned only for these days.'}</p>`:''}
    ${m==='none'?`<p class="how muted" style="font-size:13px;margin:4px 0 0">No daily recipes or shopping trips. You still get the recipe picker and a refuel suggestion after each workout.</p>`:''}`}
 function foodSpanHtml(p,G,n){
   const today=todayKey();const wk=n===7?(S.ui.foodWk||0):0;const rows=[];
@@ -4794,7 +4795,7 @@ function planLen(p){return [28,56,84].includes(+p.planLen)?+p.planLen:28}
 function tripGap(L){return L===28?7:14}
 function cycleOf(p,dk){return Math.floor(daysBetween(planStart(p),dk)/planLen(p))}
 const CYCLE_CACHE={};
-function planKey(p,G,c){return JSON.stringify([p.start,planLen(p),c,dietsOf(p),p.dietMode,p.dietDays,p.alg,p.dia,G.kcal,G.protein,p.fastOn,p.fastType,p.fastWin,p.fastWeekdays,p.fastDates,kitOf(p),p.drink||'none',hhOf(p).a,hhOf(p).k,JSON.stringify(eatOutOf(p)),mealMode(p),(p.mealWd||[]).join()])}
+function planKey(p,G,c){return JSON.stringify([p.start,planLen(p),c,dietsOf(p),p.dietMode,p.dietDays,p.alg,p.dia,G.kcal,G.protein,p.fastOn,p.fastType,p.fastWin,p.fastWeekdays,p.fastDates,kitOf(p),p.drink||'none',hhOf(p).a,hhOf(p).k,JSON.stringify(eatOutOf(p)),mealMode(p),mealWdOf(p).join()])}
 function getCycle(p,G,c){const k=planKey(p,G,c);if(!CYCLE_CACHE[k]){const ks=Object.keys(CYCLE_CACHE);if(ks.length>8)delete CYCLE_CACHE[ks[0]];CYCLE_CACHE[k]=buildCycle(p,G,c)}return CYCLE_CACHE[k]}
 function mk(sl,rx,mult,key){return {slot:sl,rx,mult,kcal:Math.round(rx.k*mult),p:Math.round(rx.p*mult),c:Math.round(rx.c*mult),key}}
 function finishDay(p,G,dk,out,kc,seed,dayN){
@@ -6806,9 +6807,9 @@ document.addEventListener('click',e=>{
       const f=foodDay(S.ui.foodDay||todayKey(),true);const oc=S.ui.elseOut;const prev=f.m[b.dataset.k];f.m[b.dataset.k]=oc?{k,out:1}:{k};f.outs=f.outs||{};if(oc)f.outs[oc]=1;else if(prev&&prev.out){const mm=mealsFor(S.profile,goalSetup(S.profile),S.ui.foodDay||todayKey()).find(x=>x.key===b.dataset.k);if(mm)delete f.outs[mm.slot[0]]}if(!Object.keys(f.outs).length)delete f.outs;S.ui.elseOut=null;save('food');closeOv();render();{const mm=mealsFor(S.profile,goalSetup(S.profile),S.ui.foodDay||todayKey()).find(x=>x.key===b.dataset.k)||{};const it={t:'Logged',k:k-(mm.kcal||0),p:Math.round(k*.18/4)-(mm.p||0)};const G=goalSetup(S.profile);
       toast(`${S.profile.ed?'Logged.':`Logged: ${impactShort(it,G,S.profile.hideCal)}.`}${oc?` Your next ${({b:'breakfast',l:'lunch',d:'dinner'})[oc]} recipes move back a day so nothing goes to waste.`:''}`)}break}
     case 'addx':openExtras();break;
-    case 'mealmode':{const t=S.ui.draft||S.profile;t.mealMode=v;if(v==='days'&&!(t.mealWd||[]).length)t.mealWd=['mon','wed','fri'];if(v!=='days')t.mealWork=false;if(!S.ui.draft)save('profile');render();break}
-    case 'mealwork':{const t=S.ui.draft||S.profile;if(+v){t.mealMode='days';t.mealWork=true;t.mealWd=['mon','tue','wed','thu','fri']}else{t.mealWork=false}if(!S.ui.draft)save('profile');render();break}
-    case 'mealwd':{const t=S.ui.draft||S.profile;const a=new Set(t.mealWd||[]);if(a.has(v))a.delete(v);else a.add(v);t.mealWd=DAYS.filter(d=>a.has(d));if(!S.ui.draft)save('profile');render();break}
+    case 'mealmode':{const t=S.ui.draft||S.profile;t.mealMode=v;if(v==='days'&&!t.mealBy&&!(t.mealWd||[]).length)t.mealBy='gym';if(v!=='days'){t.mealWork=false;t.mealBy=null}if(!S.ui.draft)save('profile');render();break}
+    case 'mealwork':{const t=S.ui.draft||S.profile;if(+v===1){t.mealMode='days';t.mealBy=null;t.mealWork=true;t.mealWd=['mon','tue','wed','thu','fri']}else if(+v===2){t.mealMode='days';t.mealWork=false;t.mealBy='gym'}else{if(t.mealBy==='gym')t.mealWd=mealWdOf(t);t.mealWork=false;t.mealBy=null}if(!S.ui.draft)save('profile');render();break}
+    case 'mealwd':{const t=S.ui.draft||S.profile;const a=new Set(mealWdOf(t));if(a.has(v))a.delete(v);else a.add(v);t.mealWd=DAYS.filter(d=>a.has(d));t.mealBy=null;if(!S.ui.draft)save('profile');render();break}
     case 'fview':S.ui.foodView=v;render();try{$('.floor').scrollTop=0}catch(e){}break;
     case 'fgo':S.ui.foodDay=v===todayKey()?null:v;S.ui.foodView='day';render();try{$('.floor').scrollTop=0}catch(e){}break;
     case 'fwk':S.ui.foodWk=Math.max(0,(S.ui.foodWk||0)+(+v));render();try{$('.floor').scrollTop=0}catch(e){}break;
