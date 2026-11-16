@@ -217,6 +217,10 @@ table.z td.n{font-family:var(--display);font-size:17px;font-weight:600;white-spa
 .ovbody>*{flex-shrink:0}
 .tabs button{font-size:14px;padding:8px 2px;letter-spacing:.02em}
 .fnav{display:flex;align-items:center;gap:8px}.fnav h2{flex:1;text-align:center;font-size:24px}.fnav .btn{padding:6px 14px;font-size:20px}
+.spanday{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;gap:8px}
+.spanlist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}.spanlist li{display:flex;gap:10px;font-size:14px;line-height:1.3}.spanlist li span{flex:0 0 96px}.spanlist li b{font-weight:600}
+.spanrow{display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:9px 2px;border-bottom:1px solid var(--line)}.spanrow:last-child{border-bottom:0}.spanrow .sd{flex:0 0 58px}.spanrow .sm{flex:1;min-width:0;font-size:13px;color:var(--muted);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.mmopts{display:flex;flex-direction:column;gap:6px}.mmopt{display:flex;flex-direction:column;gap:2px;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:12px;width:100%}.mmopt b{font-family:var(--display);font-size:17px}.mmopt span{font-size:13px;color:var(--muted)}.mmopt.on{border-color:var(--plate);background:rgba(240,208,128,.10)}.mmopt.on b{color:var(--plate)}
 .meal details{border-top:1px solid var(--line);padding-top:8px}.meal summary{cursor:pointer;color:var(--goal);font-weight:600;font-size:14px}
 ul.ing{margin:8px 0;padding-left:18px;color:var(--chalk);font-size:14px}ul.ing li.swap{color:var(--plate)}
 .mrowb{display:flex;gap:6px;flex-wrap:wrap}.mrowb .btn{padding:8px 10px;font-size:13px}
@@ -4338,12 +4342,33 @@ function rxById(p,slot,dk,id){return dietPool(p,slot,dk).find(r=>String(r.id)===
 function picksFor(p,G,dk){const f=S.food[dk];if(!f||!f.pk||!f.pk.length)return [];const kc=dayKcal(p,G,dk)||G.kcal||2000;
   return f.pk.map((x,i)=>{const rx=rxById(p,x.s,dk,x.id);if(!rx)return null;const sl=PICK_SLOT[x.s]||PICK_SLOT.s;
     const m=mk([sl[0],sl[1]+' · your pick',sl[2],''],rx,clamp(kc*sl[2]/rx.k,.5,2.2),'k:'+x.t+':'+rx.id);m.pick=i;return m}).filter(Boolean)}
-function mealModeHtml(p){const m=mealMode(p);const wd=p.mealWd||[];
-  return `<div class="eyebrow" style="margin-top:6px">Meal plan style</div>
-   <div class="seg" style="align-self:flex-start"><button data-act="mealmode" data-v="full" class="${m==='full'?'on':''}">Full plan</button><button data-act="mealmode" data-v="days" class="${m==='days'?'on':''}">Pick my days</button><button data-act="mealmode" data-v="none" class="${m==='none'?'on':''}">No plan</button></div>
-   ${m==='days'?`<div class="chips" style="margin-top:6px">${DAYS.map(d=>`<button class="chip ${wd.includes(d)?'on':''}" data-act="mealwd" data-v="${d}">${DAYS3[d]}</button>`).join('')}</div><p class="how muted" style="font-size:13px;margin:4px 0 0">Recipes and groceries are planned only for the days you pick. On the other days you eat your own way.</p>`
-    :m==='none'?`<p class="how muted" style="font-size:13px;margin:4px 0 0">No daily recipes or shopping trips. Open the recipe picker whenever you want one.</p>`
-    :`<p class="how muted" style="font-size:13px;margin:4px 0 0">A recipe for every meal, with shopping trips to match.</p>`}`}
+function mealModeHtml(t,setup){const m=mealMode(t);const wd=t.mealWd||[];const work=!!t.mealWork;
+  const opt=(v,ttl,sub)=>`<button class="mmopt ${m===v?'on':''}" data-act="mealmode" data-v="${v}" aria-pressed="${m===v}"><b>${ttl}</b><span>${sub}</span></button>`;
+  return `<div class="eyebrow" style="margin-top:6px">${setup?'How do you want to handle food?':'Meal plan style'}</div>
+   <div class="mmopts">${opt('full','Meal plan','A recipe for every meal, with shopping trips to match.')}${opt('days','Customize','You choose which days get recipes. The other days you eat your own way.')}${opt('none','Go with the flow','No set plan. Pick a recipe whenever you want one.')}</div>
+   ${m==='none'?'':`<div class="eyebrow" style="margin-top:8px">Only want a food plan on your workdays?</div>
+   <div class="seg" style="align-self:flex-start"><button data-act="mealwork" data-v="0" class="${m==='days'&&work?'':'on'}">No</button><button data-act="mealwork" data-v="1" class="${m==='days'&&work?'on':''}">Yes, workdays only</button></div>`}
+   ${m==='days'?`<div class="eyebrow" style="margin-top:8px">${work?'Which days do you work?':'Which days do you want recipes?'}</div><div class="chips">${DAYS.map(d=>`<button class="chip ${wd.includes(d)?'on':''}" data-act="mealwd" data-v="${d}" aria-pressed="${wd.includes(d)}">${DAYS3[d]}</button>`).join('')}</div><p class="how muted" style="font-size:13px;margin:4px 0 0">Recipes and groceries are planned only for these days.</p>`:''}
+   ${m==='none'?`<p class="how muted" style="font-size:13px;margin:4px 0 0">No daily recipes or shopping trips. You still get the recipe picker and a refuel suggestion after each workout.</p>`:''}`}
+function foodSpanHtml(p,G,n){
+  const today=todayKey();const wk=n===7?(S.ui.foodWk||0):0;const rows=[];
+  const name=m=>m.rx?m.rx.n:(m.out?'Eating out':String(m.slot[1]).split(' · ')[0]);
+  const fd=(dk,o)=>new Date(dk+'T12:00').toLocaleDateString(undefined,o);
+  for(let i=0;i<n;i++){const dk=addDays(today,wk*7+i);const ms=mealsFor(p,G,dk);const off=mealOff(p,dk),fast=isFastDay(p,dk);
+    let trip=false;try{trip=mealMode(p)!=='none'&&cycleDay(p,G,dk).C.trips.some(t=>t.date===dk)}catch(e){}
+    const tags=[];if(dk===today)tags.push('today');if(fast)tags.push('fasting day');if(trip)tags.push('shopping trip');
+    const kc=ms.reduce((a,m)=>a+(m.kcal||0),0),pr=ms.reduce((a,m)=>a+(m.p||0),0);
+    const none=off?'No recipes planned. Eat your own way.':fast?'No meals planned today.':'Nothing planned.';
+    if(n===7)rows.push(`<section class="card"><button class="spanday" data-act="fgo" data-v="${dk}" aria-label="Open ${fd(dk,{weekday:'long',month:'short',day:'numeric'})}"><div><div class="eyebrow">${tags.join(' · ')||'&nbsp;'}</div><h3>${fd(dk,{weekday:'long',month:'short',day:'numeric'})}</h3></div><span class="muted" style="font-size:13px;text-align:right">${ms.length?`${p.hideCal?'':kc+' kcal<br>'}${pr} g protein`:''} ›</span></button>
+      ${ms.length?`<ul class="spanlist">${ms.map(m=>`<li><span class="muted">${String(m.slot[1]).split(' · ')[0]}${m.pick!==undefined?' ★':''}</span><b>${name(m)}</b></li>`).join('')}</ul>`:`<p class="how muted" style="font-size:13px;margin:6px 0 0">${none}</p>`}</section>`);
+    else{if(i%7===0)rows.push(`<div class="eyebrow" style="margin-top:${i?12:0}px">Week ${i/7+1} · ${fd(dk,{month:'short',day:'numeric'})} to ${fd(addDays(dk,6),{month:'short',day:'numeric'})}</div>`);
+      const main=ms.filter(m=>'bld'.includes(m.slot[0]));
+      rows.push(`<button class="spanrow" data-act="fgo" data-v="${dk}"><span class="sd"><b>${fd(dk,{weekday:'short'})}</b> ${fd(dk,{day:'numeric'})}</span><span class="sm">${ms.length?(main.length?main:ms).map(name).join(' · ')+(trip?' · 🛒':''):none}</span><span class="muted">›</span></button>`)}
+  }
+  const head=n===7?`<div class="dayhead"><div class="fnav"><button class="btn" data-act="fwk" data-v="-1" aria-label="Previous week" ${wk<=0?'disabled':''}>‹</button><h2>${fd(addDays(today,wk*7),{month:'short',day:'numeric'})} to ${fd(addDays(today,wk*7+6),{month:'short',day:'numeric'})}</h2><button class="btn" data-act="fwk" data-v="1" aria-label="Next week">›</button></div><p class="how muted" style="font-size:13px;margin:4px 0 0">${wk===0?'Your next 7 days. ':''}Tap a day to open its recipes.</p></div>`
+    :`<div class="dayhead"><h2>Your next 28 days</h2><p class="how muted" style="font-size:13px;margin:4px 0 0">Starting today, not tied to the calendar month. Tap a day to open it.</p></div>`;
+  return head+`<div class="chips" style="margin:8px 0"><button class="chip" data-act="shop">Shopping list</button><button class="chip" data-act="rxpick">Recipe picker</button></div>`+(n===7?rows.join(''):`<section class="card" style="padding-block:8px">${rows.join('')}</section>`);
+}
 function pickShopHtml(p,G,st){
   try{const today=todayKey();const rows=[];
     Object.keys(S.food).filter(k=>k>=today&&S.food[k]&&S.food[k].pk&&S.food[k].pk.length).sort().forEach(dk=>{
@@ -5061,6 +5086,9 @@ function storageGuideCard(){
 }
 function renderFood(){
   const p=S.profile;const G=goalSetup(p);const today=todayKey();
+  const fv=S.ui.foodView||'day';
+  const vseg=`<div class="seg" style="align-self:flex-start;margin-bottom:10px">${[['day','Day'],['week','Week'],['month','28 days']].map(x=>`<button data-act="fview" data-v="${x[0]}" class="${fv===x[0]?'on':''}">${x[1]}</button>`).join('')}</div>`;
+  if(fv!=='day')return vseg+foodSpanHtml(p,G,fv==='week'?7:28);
   const dk=S.ui.foodDay||today;const n=daysBetween(planStart(p),dk);
   const meals=mealsFor(p,G,dk);const I=dayIntake(p,G,dk);const f=S.food[dk]||{m:{},x:[]};
   const past=dk<=today;const fb=fastingBlocked(p);
@@ -5117,7 +5145,7 @@ function renderFood(){
   const aiCard=`<section class="card"><div class="chead"><div class="t"><h3>Ask my AI</h3><div class="eq">Use ChatGPT, Claude or Gemini to log a plate or scan your kitchen</div></div></div>
    <div class="wrow" style="gap:8px;flex-wrap:wrap"><button class="btn" data-act="ai" data-v="plate">Snap my plate</button><button class="btn" data-act="ai" data-v="pantry">Scan my fridge &amp; pantry</button></div>
    ${pms.length?`<p class="how" style="margin:8px 0 0">From your pantry: ${pms.slice(0,3).map(x=>esc(x.r.n)).join(' · ')}</p>`:''}</section>`;
-  return head+tripNote+ft+sum+offCard+cards+exHtml+aiCard+planCard+(dsT.includes('veg')||dsT.includes('vegan')?dietGuide(p,G):'')+dsT.map(x=>otherDietGuide(p,G,dk,x)).join('')+storageGuideCard()+(notes.length?`<div class="note">${notes.map(n=>`<p style="margin:0 0 6px">${n}</p>`).join('')}</div>`:'')
+  return vseg+head+tripNote+ft+sum+offCard+cards+exHtml+aiCard+planCard+(dsT.includes('veg')||dsT.includes('vegan')?dietGuide(p,G):'')+dsT.map(x=>otherDietGuide(p,G,dk,x)).join('')+storageGuideCard()+(notes.length?`<div class="note">${notes.map(n=>`<p style="margin:0 0 6px">${n}</p>`).join('')}</div>`:'')
     +`<p class="muted" style="font-size:12px">Calories and nutrition are estimates. This isn't medical advice: with diabetes, pregnancy, a heart condition or any medication, check this plan with your doctor or a dietitian.</p>`;
 }
 /* ================= Ask my AI: copy a ready-made prompt into the user's own AI app, paste the answer back ================= */
@@ -5735,7 +5763,7 @@ function planLenHtml(d){
 }
 function renderFoodStep(d){
   const G=goalSetup(Object.assign({},d,{fastOn:false}));
-  const preview=mealsFor(Object.assign({},d,{fastOn:false,start:todayKey()}),G,todayKey()).filter(m=>m.rx);
+  const preview=mealsFor(Object.assign({},d,{fastOn:false,start:todayKey(),mealMode:'full'}),G,todayKey()).filter(m=>m.rx);
   return `<div class="eyebrow">Step 6 of 7</div><h1>Diabetes, diet and your meal plan</h1>
    <p class="lede">You get a rolling meal plan built to reach your goal${G.diff<0?' and lose weight at a safe pace':''}, planned around your shopping trips so food gets used before it spoils. It starts over with new combinations each cycle.</p>
    <div class="form">
@@ -5747,9 +5775,10 @@ function renderFoodStep(d){
    <div class="eyebrow">Eating style <span class="muted" style="text-transform:none;letter-spacing:0">Pick more than one to mix them.</span></div>
    <div class="chips">${DIETS.map(o=>{const on=dietsOf(d).includes(o[0]);return `<button class="chip ${on?'on':''}" data-act="diet" data-v="${o[0]}" aria-pressed="${on}">${o[1]}</button>`}).join('')}</div>
    ${dietMixHtml(d)}
-   ${hhHtml(d)}
-   ${eatOutHtml(d)}
-   ${planLenHtml(d)}
+   ${mealModeHtml(d,true)}
+   ${mealMode(d)==='none'?'':hhHtml(d)}
+   ${mealMode(d)==='none'?'':eatOutHtml(d)}
+   ${mealMode(d)==='none'?'':planLenHtml(d)}
    ${dietWarnings(d).map(w=>`<div class="note" style="border-left:4px solid var(--bad)">${w}</div>`).join('')}
    ${d.dia&&d.dia!=='none'?'<div class="note">Your plan uses diabetes-friendly meals with carbs spread evenly through the day, and shows the carbs in each meal.</div>':''}
    <div class="eyebrow">Allergies (meals swap or skip these)</div>
@@ -6777,8 +6806,12 @@ document.addEventListener('click',e=>{
       const f=foodDay(S.ui.foodDay||todayKey(),true);const oc=S.ui.elseOut;const prev=f.m[b.dataset.k];f.m[b.dataset.k]=oc?{k,out:1}:{k};f.outs=f.outs||{};if(oc)f.outs[oc]=1;else if(prev&&prev.out){const mm=mealsFor(S.profile,goalSetup(S.profile),S.ui.foodDay||todayKey()).find(x=>x.key===b.dataset.k);if(mm)delete f.outs[mm.slot[0]]}if(!Object.keys(f.outs).length)delete f.outs;S.ui.elseOut=null;save('food');closeOv();render();{const mm=mealsFor(S.profile,goalSetup(S.profile),S.ui.foodDay||todayKey()).find(x=>x.key===b.dataset.k)||{};const it={t:'Logged',k:k-(mm.kcal||0),p:Math.round(k*.18/4)-(mm.p||0)};const G=goalSetup(S.profile);
       toast(`${S.profile.ed?'Logged.':`Logged: ${impactShort(it,G,S.profile.hideCal)}.`}${oc?` Your next ${({b:'breakfast',l:'lunch',d:'dinner'})[oc]} recipes move back a day so nothing goes to waste.`:''}`)}break}
     case 'addx':openExtras();break;
-    case 'mealmode':{const p=S.profile;p.mealMode=v;if(v==='days'&&!(p.mealWd||[]).length)p.mealWd=['mon','wed','fri'];save('profile');render();break}
-    case 'mealwd':{const p=S.profile;const a=new Set(p.mealWd||[]);if(a.has(v))a.delete(v);else a.add(v);p.mealWd=DAYS.filter(d=>a.has(d));save('profile');render();break}
+    case 'mealmode':{const t=S.ui.draft||S.profile;t.mealMode=v;if(v==='days'&&!(t.mealWd||[]).length)t.mealWd=['mon','wed','fri'];if(v!=='days')t.mealWork=false;if(!S.ui.draft)save('profile');render();break}
+    case 'mealwork':{const t=S.ui.draft||S.profile;if(+v){t.mealMode='days';t.mealWork=true;t.mealWd=['mon','tue','wed','thu','fri']}else{t.mealWork=false}if(!S.ui.draft)save('profile');render();break}
+    case 'mealwd':{const t=S.ui.draft||S.profile;const a=new Set(t.mealWd||[]);if(a.has(v))a.delete(v);else a.add(v);t.mealWd=DAYS.filter(d=>a.has(d));if(!S.ui.draft)save('profile');render();break}
+    case 'fview':S.ui.foodView=v;render();try{$('.floor').scrollTop=0}catch(e){}break;
+    case 'fgo':S.ui.foodDay=v===todayKey()?null:v;S.ui.foodView='day';render();try{$('.floor').scrollTop=0}catch(e){}break;
+    case 'fwk':S.ui.foodWk=Math.max(0,(S.ui.foodWk||0)+(+v));render();try{$('.floor').scrollTop=0}catch(e){}break;
     case 'rxpick':openRxPick();break;
     case 'rxtab':openRxPick(v);break;
     case 'rxadd':{const today=!!b.dataset.today;const dk=today?todayKey():(S.ui.foodDay||todayKey());const f=foodDay(dk,true);(f.pk=f.pk||[]).push({s:b.dataset.s,id:b.dataset.id,t:Date.now()%1e9});save('food');
