@@ -287,7 +287,7 @@ a.btn{text-decoration:none;color:inherit}a.btn.primary{color:var(--plate-ink)}
 .floor.wk{display:flex;flex-direction:column;overflow:hidden}
 .view.today{flex:1;min-height:0;display:flex;flex-direction:column;padding:0;max-width:none;gap:0}
 .cnav{display:flex;align-items:center;gap:8px;padding-block:6px;border-bottom:1px solid var(--line)}
-.cnav .btn{padding:4px 14px;font-size:20px}
+.cnav .btn{padding:4px 14px;font-size:20px}.cnav .btn.ovw{font-size:13px;padding:9px 10px;letter-spacing:.02em}
 .cdots{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .clab{font-family:var(--display);font-weight:600;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .carousel{flex:1;min-height:0;display:flex;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
@@ -5903,7 +5903,7 @@ function renderToday(){
   const left=day.items.filter(it=>!it.brk&&!isDone(it));
   const finish=`<div class="slide" data-s="${day.items.length+1}"><div class="dayhead"><div class="eyebrow">Finish</div><h2>${left.length?`${left.length} to go`:'All done!'}</h2></div>
     ${left.length?`<ol class="olist">${left.map(it=>`<li><button data-act="goslide" data-v="${day.items.indexOf(it)+1}"><span>${it.n}</span><span class="muted">›</span></button></li>`).join('')}</ol>`:`<button class="btn primary" data-act="cele">See your workout summary</button>`}</div>`;
-  const nav=`<div class="cnav gut"><button class="btn" data-act="slide" data-v="-1" aria-label="Previous card">‹</button><div class="cdots" id="cdots"></div><button class="btn" data-act="slide" data-v="1" aria-label="Next card">›</button></div>`;
+  const nav=`<div class="cnav gut"><button class="btn ovw" id="ovwbtn" data-act="goslide" data-v="0" aria-label="Back to the workout overview">Overview</button><button class="btn" data-act="slide" data-v="-1" aria-label="Previous card">‹</button><div class="cdots" id="cdots"></div><button class="btn" data-act="slide" data-v="1" aria-label="Next card">›</button></div>`;
   return nav+`<div class="carousel" id="car">${overview}${cards}${finish}</div>`;
 }
 function isDone(it){const e=peekToday(it.id);return e&&e.sets.length>=it.sets}
@@ -6401,7 +6401,7 @@ function openQR(){
   ov.querySelector('#qrfile').addEventListener('change',e=>{const f=e.target.files[0];if(f)startCrop(f)});
   refreshAds();
 }
-function closeOv(){const o=$('#ov');if(o){const was=o.classList.contains('cele');o.remove();refreshAds();if(was)setTimeout(()=>maybeInterstitial('done'),300)}}
+function closeOv(){const o=$('#ov');if(o){const was=o.classList.contains('cele');const due=o.dataset.addue;o.remove();refreshAds();if(was)setTimeout(()=>maybeInterstitial('done'),300);else if(due)setTimeout(()=>maybeInterstitial(due),150)}}
 function startCrop(file){
   const url=URL.createObjectURL(file);closeOv();
   const ov=document.createElement('div');ov.id='ov';ov.className='ov';
@@ -6450,6 +6450,7 @@ function drawDots(){
   const d=$('#cdots');if(!d)return;const n=S.ui.slides||1,i=S.ui.slide||0;
   const plan=buildPlan(S.profile),day=plan[currentDay(plan)];
   const it=day&&i>0&&i<=day.items.length?day.items[i-1]:null;
+  const ob=$('#ovwbtn');if(ob)ob.style.display=i===0?'none':'';
   d.innerHTML=`<span class="clab">${i===0?'Overview':i===n-1?'Finish':esc(it?it.n.split(' · ')[0]:'')}</span><span class="muted">${i+1} / ${n}</span>`;
 }
 function goSlide(i,smooth){
@@ -6489,7 +6490,7 @@ function openWaterBreak(it){
     <button class="btn ${ad?'':'primary'}" data-act="ovclose" id="wbbtn">${ad?'Play now':'OK'}</button>
   </div>`;
   document.body.appendChild(ov);refreshAds();
-  if(ad){let n=4;const b=$('#wbbtn');const tick=()=>{if(!$('#ov.water'))return;if(--n<=0){closeOv();maybeInterstitial('break');return}
+  if(ad){ov.dataset.addue='break';let n=4;const b=$('#wbbtn');const tick=()=>{if(!$('#ov.water'))return;if(--n<=0){closeOv();return}
       const m=$('#wbmsg');if(m)m.textContent=`Sponsored video in ${n}…`;setTimeout(tick,1000)};setTimeout(tick,1000);
     b.dataset.act='wbnow';}
 }
@@ -6644,11 +6645,11 @@ function afterExercise(id){
     <div class="eyebrow">Next up</div>
     <h1 class="cheer" style="font-size:clamp(30px,8vw,42px)">${esc(nx.brk?'Rest break':nx.n)}</h1>
     <p class="lede" style="text-align:center;margin:0">${nx.brk?'Grab some water once the machine is clean.':(nx.sets&&nx.lo?`${nx.sets} sets of ${nx.lo}–${nx.hi}`:'')+where}</p>
-    ${ad?`<p class="muted" style="margin:0;text-align:center" id="numsg">A short sponsored video plays in <b class="num" id="nucount">10</b>… (muted and skippable, so your music keeps going)</p>`:''}
+    ${ad?`<p class="muted" style="margin:0;text-align:center" id="numsg">A short sponsored video plays in <b class="num" id="nucount">10</b>… (muted, so your music keeps going)</p>`:''}
     <button class="btn primary" data-act="nextgo">${wipe?'All wiped down, let\'s go':'I\'m there, let\'s go'}</button>
   </div>`;
-  document.body.appendChild(ov);refreshAds();if(!ad)return;
-  let n=10;const tick=()=>{if(!$('#ov.nextup'))return;if(--n<=0){const m=$('#numsg');if(m)m.textContent='Head to your machine while the video plays. Ad-Free removes these.';maybeInterstitial('next');return}
+  document.body.appendChild(ov);refreshAds();if(!ad)return;ov.dataset.addue='next';
+  let n=10;const tick=()=>{const o2=$('#ov.nextup');if(!o2)return;if(--n<=0){delete o2.dataset.addue;const m=$('#numsg');if(m)m.textContent='Head to your machine while the video plays. Ad-Free removes these.';maybeInterstitial('next');return}
     const c=$('#nucount');if(c)c.textContent=n;setTimeout(tick,1000)};setTimeout(tick,1000);
 }
 function finishTimed(id,auto){
@@ -6731,7 +6732,7 @@ document.addEventListener('click',e=>{
     case 'tourend':endTour();break;
     case 'tourstart':startTour();break;
     case 'nextgo':closeOv();goSlide(S.ui.nextSlide!=null?S.ui.nextSlide:(S.ui.slide||0)+1);break;
-    case 'wbnow':closeOv();maybeInterstitial('break');break;
+    case 'wbnow':closeOv();break;
     case 'slide':goSlide((S.ui.slide||0)+(+v));break;
     case 'cele':{const plan=buildPlan(S.profile);openCelebrate(plan[currentDay(plan)]);break}
     case 'minorwarn':openMinorWarn();break;
