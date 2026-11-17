@@ -6106,10 +6106,47 @@ function strTick(){const g=S.ui.str;if(!g){clearInterval(strT);strT=null;return}
   if(left<=0&&!g.beeped){g.beeped=true;ding();try{navigator.vibrate&&navigator.vibrate(200)}catch(_){}
     const it=findItem(g.id);const L=it?stretchFor(it):[];if(g.k+1<L.length){g.k++;g.end=Date.now()+30000;g.beeped=false;render()}else{S.ui.str=null;toast('Stretches done. Nice.');render()}}}
 function strStart(id,k){S.ui.str={id,k,end:Date.now()+30000};clearInterval(strT);strT=setInterval(strTick,500);render()}
+function hrMachine(it){const x=((it.n||'')+' '+(it.eq||'')).toLowerCase();
+  if(/treadmill/.test(x))return {ease:'Lower the speed by 0.3 to 0.5 mph, or drop the incline by 1 to 2 percent. Change one, not both.',slow:'Bring the incline to 0 and slow to an easy walk, around 2 to 2.5 mph.',again:'a slower speed or lower incline than before'};
+  if(/bike|cycle|spin/.test(x))return {ease:'Drop the resistance by 1 or 2 levels and keep your legs turning at the same easy rhythm.',slow:'Drop the resistance to the lowest level and pedal slowly.',again:'a lower resistance than before'};
+  if(/elliptical|arc|cross.?trainer/.test(x))return {ease:'Drop the resistance by 1 or 2 levels, or lower the ramp, and slow your stride a little.',slow:'Drop the resistance and ramp to the lowest setting and move slowly.',again:'a lower resistance than before'};
+  if(/stair|step/.test(x))return {ease:'Lower the level by 1 or 2 so the steps come slower. Stand tall and don\'t lean on the rails.',slow:'Lower it to level 1 or 2 and step slowly, or step off and walk.',again:'a lower level than before'};
+  if(/row/.test(x))return {ease:'Take fewer strokes per minute and push less hard with your legs. Keep the damper where it is.',slow:'Row very lightly, or stop rowing and walk slowly.',again:'fewer strokes per minute than before'};
+  return {ease:'Slow your pace a notch. If you are on a hill or incline, flatten it out.',slow:'Slow right down to an easy walk.',again:'an easier pace than before'}}
+function openHrHigh(id,lvl){
+  const p=S.profile,it=findItem(id);if(!it||!it.hr)return;
+  const lo=bpm(p,it.hr[0]),hi=bpm(p,it.hr[1]),cap=bpm(p,.85),mx=maxHR(p);const M=hrMachine(it);
+  lvl=lvl==='2'?'2':'1';
+  const steps=lvl==='1'?[
+    `<b>Ease off, don't stop.</b> ${M.ease}`,
+    'Breathe slowly: in through your nose, long breath out through your mouth. Drop your shoulders and loosen your grip.',
+    `Give it <b>60 to 90 seconds</b>, then check again. Heart rate takes a little while to follow.`,
+    `Still over ${hi}? Ease off one more notch and wait again. Repeat until you are back between <b>${lo} and ${hi}</b>.`,
+    'Once you are in range, stay at that easier setting for the rest of today.'
+  ]:[
+    `<b>Slow right down, but keep moving.</b> ${M.slow} Don't stop suddenly, because that can make you light-headed.`,
+    'Hold on if you need to, sip some water, and breathe slowly: in through your nose, long breath out through your mouth.',
+    `Keep moving gently for <b>2 to 3 minutes</b>, then check again.`,
+    `When you are back under <b>${hi}</b>, you can pick it up again at ${M.again}.`,
+    `Not coming down after about 5 minutes of easy movement? Call the cardio done for today. That still counts.`
+  ];
+  closeOv();const ov=document.createElement('div');ov.id='ov';ov.className='ov';
+  ov.innerHTML=`<div class="ovbar gut"><strong style="font-family:var(--display);font-size:20px">Bring your heart rate down</strong><button class="btn" data-act="ovclose">Close</button></div>
+   <div class="ovbody gut" style="justify-content:flex-start;align-items:stretch;max-width:560px;margin:0 auto;width:100%">
+    <p class="lede" style="margin:0">Your target for ${esc(String(it.n).split(' · ')[0])} is <b>${lo} to ${hi} bpm</b>. Your limit is <b>${cap}</b>.</p>
+    <div class="eyebrow">Where is it right now?</div>
+    <div class="mmopts"><button class="mmopt ${lvl==='1'?'on':''}" data-act="hrlvl" data-id="${it.id}" data-v="1"><b>A little over: ${hi+1} to ${cap-1}</b><span>Above your target but under your limit.</span></button>
+      <button class="mmopt ${lvl==='2'?'on':''}" data-act="hrlvl" data-id="${it.id}" data-v="2"><b>${cap} or higher</b><span>At or over your limit.</span></button></div>
+    <div class="card"><ol class="steps" style="margin:0">${steps.map(x=>`<li>${x}</li>`).join('')}</ol></div>
+    <div class="note" style="border-left:4px solid var(--bad)"><b>Stop and get help right away</b> if you have chest pain or pressure, feel faint or dizzy, can't catch your breath even after slowing down, or your heartbeat feels irregular or fluttery. Tell gym staff, and call 911 for chest pain or fainting.</div>
+    <details class="card"><summary><b>Why it might be reading high</b></summary><ul class="ing"><li>Hand-grip sensors and wrist watches can misread. Check twice before you trust one number.</li><li>Heat, caffeine, poor sleep, stress and not drinking enough water all push heart rate up.</li><li>Some medicines change heart rate. If you take any for your heart or blood pressure, use your doctor's targets instead of these.</li><li>Your limit of ${cap} is 85% of ${mx}, ${ownMax(p)?'the highest heart rate you entered':'an estimate from your age'}. If you go over often while the effort feels easy, mention it to your doctor.</li></ul></details>
+   </div>`;
+  document.body.appendChild(ov);try{refreshAds()}catch(e){}
+}
 function timedCard(it,i){
   const p=S.profile;const e=peekToday(it.id),sets=e?e.sets:[],done=sets.length>=it.sets;
   const t=S.timed[it.id];const left=t?t.secs-(t.acc+(t.run?(Date.now()-t.start)/1000:0)):it.secs;
-  const hr=it.hr?`<div class="hr"><span class="eyebrow">Target heart rate</span><span class="big num">${bpm(p,it.hr[0])}–${bpm(p,it.hr[1])}</span><span class="muted">bpm · stay under ${bpm(p,.85)}</span></div>`:'';
+  const hr=it.hr?`<div class="hr"><span class="eyebrow">Target heart rate</span><span class="big num">${bpm(p,it.hr[0])}–${bpm(p,it.hr[1])}</span><span class="muted">bpm · stay under ${bpm(p,.85)}</span></div><div style="margin:-2px 0 8px"><button class="btn" data-act="hrhigh" data-id="${it.id}" style="font-size:14px;padding:7px 12px">Heart rate too high? Bring it down</button></div>`:'';
   return `<section class="card ${done?'done':''} ${it.brk?'brk':''}">
     <div class="chead"><div class="idx">${done?'✓':it.brk?'⏸':i||'W'}</div><div class="t"><h3>${it.n}</h3><div class="eq">${it.eq}</div></div>
       <div class="scheme">${it.sets>1?it.sets+' × ':''}${it.secs>=120?Math.round(it.secs/60)+' min':it.secs+' s'}${it.sets>1?'<small>rest 60s</small>':''}</div></div>
@@ -6780,6 +6817,8 @@ document.addEventListener('click',e=>{
     case 'mctl':Native.control(v);if(MEDIA&&v==='toggle'){MEDIA.playing=!MEDIA.playing;drawMusic()}break;
     case 'mopenpkg':if(MEDIA&&MEDIA.pkg)Native.openApp(MEDIA.pkg);break;
     case 'ovclose':closeOv();break;
+    case 'hrhigh':openHrHigh(b.dataset.id,'1');break;
+    case 'hrlvl':openHrHigh(b.dataset.id,v);break;
     case 'gymday':{const g=gymState();g.day=v;gymPut(g);render();break}
     case 'gymall':{const g=gymState();g.all=!!+v;gymPut(g);render();break}
     case 'gymres':{const g=gymState();g.res=g.res||{};if(g.res[v]){delete g.res[v];toast('Spot cancelled')}else{g.res[v]=1;toast('Spot saved'+(partner()&&partner().demo?' (demo: saved on this phone only)':''))}gymPut(g);render();break}

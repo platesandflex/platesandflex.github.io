@@ -216,6 +216,9 @@ table.z td.n{font-family:var(--display);font-size:17px;font-weight:600;white-spa
 .confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .ovbody>*{flex-shrink:0}
 .tabs button{font-size:14px;padding:8px 2px;letter-spacing:.02em}
+.gcl{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}.gcl:last-child{border-bottom:0}.gcl .gt{flex:0 0 70px;font-family:var(--display);font-weight:600;font-size:16px}.gcl .gn{flex:1;min-width:0}.gcl .gn b{display:block}.gcl .gn span{display:block;font-size:13px;color:var(--muted)}.gcl .btn{padding:7px 10px;font-size:14px;white-space:nowrap}
+.gsel{width:100%;padding:11px 12px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--fg);font:inherit;font-size:16px}
+.gtbl{width:100%;border-collapse:collapse;font-size:14px}.gtbl td{padding:6px 0;border-bottom:1px solid var(--line)}.gtbl td:last-child{text-align:right;font-weight:600;white-space:nowrap}
 .fnav{display:flex;align-items:center;gap:8px}.fnav h2{flex:1;text-align:center;font-size:24px}.fnav .btn{padding:6px 14px;font-size:20px}
 .spanday{display:flex;justify-content:space-between;align-items:center;width:100%;text-align:left;gap:8px}
 .spanlist{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:5px}.spanlist li{display:flex;gap:10px;font-size:14px;line-height:1.3}.spanlist li span{flex:0 0 96px}.spanlist li b{font-weight:600}
@@ -717,7 +720,7 @@ document.addEventListener('error',e=>{
 },true);
 
 /* ================= storage ================= */
-const LS='plate-pace-v1';
+const LS=window.PF_LS||'plate-pace-v1';
 const S={profile:null,logs:{},qr:null,food:{},wt:[],ui:{view:'today',day:null,step:0,draft:null,confirmReset:false},live:{},timed:{}};
 let T={profile:0,logs:0,qr:0,food:0,wt:0};
 const store={db:null,base:null,timers:{},busy:{},again:{}};
@@ -5872,6 +5875,58 @@ function cardioFields(it){
   </div>`;
 }
 
+
+/* ================= partner gyms =================
+   Off by default. A page turns it on by setting window.PF_PARTNER (an id) and window.PF_PARTNERS[id] (the gym's data)
+   before this script runs. Class "spots" are saved on this device only. */
+const PARTNERS=window.PF_PARTNERS||{};
+function partner(){const k=window.PF_PARTNER;return (k&&PARTNERS[k])||null}
+if(partner()){try{CHAINS.other=Object.assign({},CHAINS.other,{n:partner().name,s:partner().short||partner().name});if(partner().startView)S.ui.view=partner().startView}catch(e){}}
+function gymState(){try{return JSON.parse(localStorage.getItem(LS+'-gym')||'{}')||{}}catch(e){return {}}}
+function gymPut(g){try{localStorage.setItem(LS+'-gym',JSON.stringify(g))}catch(e){}}
+function gymLoc(P,g){return P.locs.find(l=>l.id===g.loc)||P.locs[0]}
+function gymMins(t){const m=/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i.exec(String(t).trim())||[];let h=(+m[1]||0)%12;if(/pm/i.test(m[3]||''))h+=12;return h*60+(+m[2]||0)}
+function gymClassList(P,g,dk){const dn=dayNameOf(dk);const locs=g.all?P.locs:[gymLoc(P,g)];const out=[];
+  locs.forEach(l=>(((P.classes||{})[l.id]||{})[dn]||[]).forEach(c=>out.push({l,t:c[0],n:c[1],who:c[2],k:[l.id,dk,c[0],c[1]].join('|'),m:gymMins(c[0])})));
+  return out.sort((a,b)=>a.m-b.m||a.l.n.localeCompare(b.l.n))}
+function gymSaved(P,g){const today=todayKey();return Object.keys(g.res||{}).map(k=>{const a=k.split('|');const l=P.locs.find(x=>x.id===a[0]);return l?{k,l,dk:a[1],t:a[2],n:a[3],m:gymMins(a[2])}:null}).filter(x=>x&&x.dk>=today).sort((a,b)=>a.dk<b.dk?-1:a.dk>b.dk?1:a.m-b.m)}
+function gymDayLbl(dk,long){return dk===todayKey()?'Today':new Date(dk+'T12:00').toLocaleDateString(undefined,long?{weekday:'long',month:'short',day:'numeric'}:{weekday:'short',day:'numeric'})}
+function gymWeekCard(){const P=partner();if(!P)return '';const sv=gymSaved(P,gymState());if(!sv.length)return '';
+  return `<div class="card"><h3>Your classes at ${esc(P.short||P.name)}</h3>${sv.slice(0,8).map(x=>`<div class="gcl"><div class="gt">${esc(x.t)}</div><div class="gn"><b>${esc(x.n)}</b><span>${gymDayLbl(x.dk,true)} · ${esc(x.l.n)}</span></div></div>`).join('')}<div style="margin-top:8px"><button class="btn" data-act="view" data-v="gym">Open ${esc(P.tab||'My Gym')}</button></div></div>`}
+function renderGym(){
+  const P=partner(),g=gymState(),L=gymLoc(P,g),today=todayKey();const dk=g.day&&g.day>=today?g.day:today;
+  const now=new Date();const nowM=now.getHours()*60+now.getMinutes();
+  const days=[0,1,2,3,4,5,6].map(i=>addDays(today,i));
+  const list=gymClassList(P,g,dk),res=g.res||{},sv=gymSaved(P,g);
+  const maps='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(P.name+' '+L.addr+' '+L.city);
+  const tr=(P.trainers||{})[L.id]||[];const cc=(P.childcare||{})[L.id];
+  const row=c=>{const on=!!res[c.k];const past=dk===today&&c.m<nowM-10;
+    return `<div class="gcl"><div class="gt">${esc(c.t)}</div><div class="gn"><b>${esc(c.n)}</b><span>${c.who?'with '+esc(c.who):''}${g.all?(c.who?' · ':'')+esc(c.l.n):''}</span></div>${past?'<span class="muted" style="font-size:13px">Started</span>':`<button class="btn ${on?'primary':''}" data-act="gymres" data-v="${esc(c.k)}" aria-pressed="${on}">${on?'✓ Spot saved':'Save my spot'}</button>`}</div>`};
+  return `<div class="dayhead"><div class="eyebrow">${esc(P.tag||'Your gym')}</div><h2>${esc(P.name)}</h2></div>
+   ${P.demo?`<div class="note" style="border-left:4px solid var(--plate)"><b>Concept demo.</b> ${P.demo}</div>`:''}
+   <div class="card"><div class="eyebrow">My location</div>
+     <select class="gsel" id="gymloc" aria-label="Choose your gym location">${P.locs.map(l=>`<option value="${l.id}" ${l.id===L.id?'selected':''}>${esc(l.n)}</option>`).join('')}</select>
+     <p class="how" style="margin:8px 0 2px"><b>${esc(L.addr)}</b>, ${esc(L.city)}</p>
+     <p class="how muted" style="font-size:13px;margin:0 0 8px">${esc(L.note||P.access||'')}</p>
+     <div class="chips"><a class="btn" href="${maps}" target="_blank" rel="noopener">Directions</a>${P.phone?`<a class="btn" href="tel:${P.phone.replace(/[^0-9+]/g,'')}">Call ${esc(P.phone)}</a>`:''}${P.memberUrl?`<a class="btn" href="${P.memberUrl}" target="_blank" rel="noopener">Pay / member login</a>`:''}</div></div>
+   <div class="card"><h3>Group classes</h3>
+     <div class="chips">${days.map(d=>`<button class="chip ${d===dk?'on':''}" data-act="gymday" data-v="${d}">${gymDayLbl(d)}</button>`).join('')}</div>
+     <div class="seg" style="align-self:flex-start;margin:8px 0 2px"><button data-act="gymall" data-v="0" class="${g.all?'':'on'}">${esc(L.short||L.n)}</button><button data-act="gymall" data-v="1" class="${g.all?'on':''}">All locations</button></div>
+     ${list.length?list.map(row).join(''):`<p class="how muted" style="margin:8px 0 0">No classes ${g.all?'':'at this location '}on ${gymDayLbl(dk,true)}.${g.all?'':' Try All locations: your membership works at every gym.'}</p>`}
+     <p class="muted" style="font-size:12px;margin:8px 0 0">${esc(P.classNote||'')}</p></div>
+   ${sv.length?`<div class="card"><h3>My saved classes</h3>${sv.map(x=>`<div class="gcl"><div class="gt">${esc(x.t)}</div><div class="gn"><b>${esc(x.n)}</b><span>${gymDayLbl(x.dk,true)} · ${esc(x.l.n)}</span></div><button class="btn" data-act="gymres" data-v="${esc(x.k)}">Cancel</button></div>`).join('')}<p class="muted" style="font-size:12px;margin:8px 0 0">They also show on your Week tab.</p></div>`:''}
+   ${tr.length||P.ptPrices?`<div class="card"><h3>Personal trainers</h3>${tr.length?`<p class="how" style="margin:0 0 6px">At ${esc(L.short||L.n)}: ${tr.map(esc).join(', ')}.</p>`:''}
+     ${P.ptPrices?`<table class="gtbl">${P.ptPrices.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>`:''}
+     ${P.phone?`<div style="margin-top:10px"><a class="btn" href="tel:${P.phone.replace(/[^0-9+]/g,'')}">Ask about training</a></div>`:''}</div>`:''}
+   ${P.childcare?`<div class="card"><h3>Childcare</h3><p class="how" style="margin:0">${cc?`<b>${esc(cc)}</b> at ${esc(L.short||L.n)}.`:`Not available at ${esc(L.short||L.n)} right now.`}</p>${P.childcareNote?`<p class="how muted" style="font-size:13px;margin:6px 0 0">${esc(P.childcareNote)}</p>`:''}</div>`:''}
+   ${P.plans?`<div class="card"><h3>Membership</h3><table class="gtbl">${P.plans.map(r=>`<tr><td>${esc(r[0])}${r[2]?`<div class="muted" style="font-size:12px">${esc(r[2])}</div>`:''}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>
+     ${P.planNote?`<p class="how muted" style="font-size:13px;margin:8px 0 0">${esc(P.planNote)}</p>`:''}${P.joinUrl?`<div style="margin-top:10px"><a class="btn primary" href="${P.joinUrl}" target="_blank" rel="noopener">Membership details</a></div>`:''}</div>`:''}
+   ${(P.notes||[]).length?`<div class="card"><h3>From the gym</h3><ul class="ing">${P.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul></div>`:''}
+   ${P.perk?`<div class="card" style="border-color:var(--plate)"><h3>${esc(P.perk[0])}</h3><p class="how" style="margin:0">${esc(P.perk[1])}</p></div>`:''}
+   <p class="muted" style="font-size:12px">${esc(P.source||'')}</p>`;
+}
+document.addEventListener('change',e=>{const t=e.target;if(t&&t.id==='gymloc'&&partner()){const g=gymState();g.loc=t.value;gymPut(g);render()}});
+
 /* ================= render ================= */
 let notifT;function render(){render0();clearTimeout(notifT);notifT=setTimeout(syncNotifs,1200);if(S.profile&&!S.ui.draft&&S.ui.tour==null&&!tourDone()){S.ui.tour=0;S.ui.tourSlide=S.ui.slide||0;setTimeout(showTour,400)}else if(S.ui.tour!=null){if(!$('#tour'))setTimeout(showTour,0);else setTimeout(tourPlace,0)}}
 function render0(){
@@ -5895,8 +5950,8 @@ function render0(){
     <div class="mrow" id="mrow">${musicInner()}</div>
   </header>
   <main class="floor ${S.ui.view==='today'?'wk':''}">
-    <nav class="tabs gut">${[['today','Workout'],['food','Food'],['week','Week'],['goal','Goal'],['me','Me']].map(v=>`<button data-act="view" data-v="${v[0]}" class="${S.ui.view===v[0]?'on':''}">${v[1]}</button>`).join('')}</nav>
-    <div class="view ${S.ui.view==='today'?'today':'gut'}">${S.ui.view==='today'?renderToday():S.ui.view==='food'?renderFood():S.ui.view==='goal'?renderGoal():S.ui.view==='week'?renderWeek():renderMe()}</div>
+    <nav class="tabs gut">${[['today','Workout'],['food','Food'],['week','Week'],['goal','Goal'],['me','Me']].concat(partner()?[['gym',partner().tab||'My Gym']]:[]).map(v=>`<button data-act="view" data-v="${v[0]}" class="${S.ui.view===v[0]?'on':''}">${v[1]}</button>`).join('')}</nav>
+    <div class="view ${S.ui.view==='today'?'today':'gut'}">${S.ui.view==='today'?renderToday():S.ui.view==='food'?renderFood():S.ui.view==='goal'?renderGoal():S.ui.view==='week'?renderWeek()+gymWeekCard():S.ui.view==='gym'&&partner()?renderGym():renderMe()}</div>
   </main>`;
   drawTimer();refreshAds();if(S.ui.view==='today')initCarousel();
   detailsRestore(openKeys);
@@ -6045,10 +6100,47 @@ function strTick(){const g=S.ui.str;if(!g){clearInterval(strT);strT=null;return}
   if(left<=0&&!g.beeped){g.beeped=true;ding();try{navigator.vibrate&&navigator.vibrate(200)}catch(_){}
     const it=findItem(g.id);const L=it?stretchFor(it):[];if(g.k+1<L.length){g.k++;g.end=Date.now()+30000;g.beeped=false;render()}else{S.ui.str=null;toast('Stretches done. Nice.');render()}}}
 function strStart(id,k){S.ui.str={id,k,end:Date.now()+30000};clearInterval(strT);strT=setInterval(strTick,500);render()}
+function hrMachine(it){const x=((it.n||'')+' '+(it.eq||'')).toLowerCase();
+  if(/treadmill/.test(x))return {ease:'Lower the speed by 0.3 to 0.5 mph, or drop the incline by 1 to 2 percent. Change one, not both.',slow:'Bring the incline to 0 and slow to an easy walk, around 2 to 2.5 mph.',again:'a slower speed or lower incline than before'};
+  if(/bike|cycle|spin/.test(x))return {ease:'Drop the resistance by 1 or 2 levels and keep your legs turning at the same easy rhythm.',slow:'Drop the resistance to the lowest level and pedal slowly.',again:'a lower resistance than before'};
+  if(/elliptical|arc|cross.?trainer/.test(x))return {ease:'Drop the resistance by 1 or 2 levels, or lower the ramp, and slow your stride a little.',slow:'Drop the resistance and ramp to the lowest setting and move slowly.',again:'a lower resistance than before'};
+  if(/stair|step/.test(x))return {ease:'Lower the level by 1 or 2 so the steps come slower. Stand tall and don\'t lean on the rails.',slow:'Lower it to level 1 or 2 and step slowly, or step off and walk.',again:'a lower level than before'};
+  if(/row/.test(x))return {ease:'Take fewer strokes per minute and push less hard with your legs. Keep the damper where it is.',slow:'Row very lightly, or stop rowing and walk slowly.',again:'fewer strokes per minute than before'};
+  return {ease:'Slow your pace a notch. If you are on a hill or incline, flatten it out.',slow:'Slow right down to an easy walk.',again:'an easier pace than before'}}
+function openHrHigh(id,lvl){
+  const p=S.profile,it=findItem(id);if(!it||!it.hr)return;
+  const lo=bpm(p,it.hr[0]),hi=bpm(p,it.hr[1]),cap=bpm(p,.85),mx=maxHR(p);const M=hrMachine(it);
+  lvl=lvl==='2'?'2':'1';
+  const steps=lvl==='1'?[
+    `<b>Ease off, don't stop.</b> ${M.ease}`,
+    'Breathe slowly: in through your nose, long breath out through your mouth. Drop your shoulders and loosen your grip.',
+    `Give it <b>60 to 90 seconds</b>, then check again. Heart rate takes a little while to follow.`,
+    `Still over ${hi}? Ease off one more notch and wait again. Repeat until you are back between <b>${lo} and ${hi}</b>.`,
+    'Once you are in range, stay at that easier setting for the rest of today.'
+  ]:[
+    `<b>Slow right down, but keep moving.</b> ${M.slow} Don't stop suddenly, because that can make you light-headed.`,
+    'Hold on if you need to, sip some water, and breathe slowly: in through your nose, long breath out through your mouth.',
+    `Keep moving gently for <b>2 to 3 minutes</b>, then check again.`,
+    `When you are back under <b>${hi}</b>, you can pick it up again at ${M.again}.`,
+    `Not coming down after about 5 minutes of easy movement? Call the cardio done for today. That still counts.`
+  ];
+  closeOv();const ov=document.createElement('div');ov.id='ov';ov.className='ov';
+  ov.innerHTML=`<div class="ovbar gut"><strong style="font-family:var(--display);font-size:20px">Bring your heart rate down</strong><button class="btn" data-act="ovclose">Close</button></div>
+   <div class="ovbody gut" style="justify-content:flex-start;align-items:stretch;max-width:560px;margin:0 auto;width:100%">
+    <p class="lede" style="margin:0">Your target for ${esc(String(it.n).split(' · ')[0])} is <b>${lo} to ${hi} bpm</b>. Your limit is <b>${cap}</b>.</p>
+    <div class="eyebrow">Where is it right now?</div>
+    <div class="mmopts"><button class="mmopt ${lvl==='1'?'on':''}" data-act="hrlvl" data-id="${it.id}" data-v="1"><b>A little over: ${hi+1} to ${cap-1}</b><span>Above your target but under your limit.</span></button>
+      <button class="mmopt ${lvl==='2'?'on':''}" data-act="hrlvl" data-id="${it.id}" data-v="2"><b>${cap} or higher</b><span>At or over your limit.</span></button></div>
+    <div class="card"><ol class="steps" style="margin:0">${steps.map(x=>`<li>${x}</li>`).join('')}</ol></div>
+    <div class="note" style="border-left:4px solid var(--bad)"><b>Stop and get help right away</b> if you have chest pain or pressure, feel faint or dizzy, can't catch your breath even after slowing down, or your heartbeat feels irregular or fluttery. Tell gym staff, and call 911 for chest pain or fainting.</div>
+    <details class="card"><summary><b>Why it might be reading high</b></summary><ul class="ing"><li>Hand-grip sensors and wrist watches can misread. Check twice before you trust one number.</li><li>Heat, caffeine, poor sleep, stress and not drinking enough water all push heart rate up.</li><li>Some medicines change heart rate. If you take any for your heart or blood pressure, use your doctor's targets instead of these.</li><li>Your limit of ${cap} is 85% of ${mx}, ${ownMax(p)?'the highest heart rate you entered':'an estimate from your age'}. If you go over often while the effort feels easy, mention it to your doctor.</li></ul></details>
+   </div>`;
+  document.body.appendChild(ov);try{refreshAds()}catch(e){}
+}
 function timedCard(it,i){
   const p=S.profile;const e=peekToday(it.id),sets=e?e.sets:[],done=sets.length>=it.sets;
   const t=S.timed[it.id];const left=t?t.secs-(t.acc+(t.run?(Date.now()-t.start)/1000:0)):it.secs;
-  const hr=it.hr?`<div class="hr"><span class="eyebrow">Target heart rate</span><span class="big num">${bpm(p,it.hr[0])}–${bpm(p,it.hr[1])}</span><span class="muted">bpm · stay under ${bpm(p,.85)}</span></div>`:'';
+  const hr=it.hr?`<div class="hr"><span class="eyebrow">Target heart rate</span><span class="big num">${bpm(p,it.hr[0])}–${bpm(p,it.hr[1])}</span><span class="muted">bpm · stay under ${bpm(p,.85)}</span></div><div style="margin:-2px 0 8px"><button class="btn" data-act="hrhigh" data-id="${it.id}" style="font-size:14px;padding:7px 12px">Heart rate too high? Bring it down</button></div>`:'';
   return `<section class="card ${done?'done':''} ${it.brk?'brk':''}">
     <div class="chead"><div class="idx">${done?'✓':it.brk?'⏸':i||'W'}</div><div class="t"><h3>${it.n}</h3><div class="eq">${it.eq}</div></div>
       <div class="scheme">${it.sets>1?it.sets+' × ':''}${it.secs>=120?Math.round(it.secs/60)+' min':it.secs+' s'}${it.sets>1?'<small>rest 60s</small>':''}</div></div>
@@ -6259,8 +6351,8 @@ const TOUR=[
  {v:'me',hi:'[data-act=tourstart]',opt:1,t:'Replay the tour',b:`Come back here any time to see this tour again.`},
  {v:'today',t:'Changing things later',b:`<ul><li><b>Workout days or times:</b> Week → Change workout days</li><li><b>Goal, pace, diet, allergies or fasting:</b> Goal → Change goal, food or fasting settings</li><li><b>Household, meals out, plan length:</b> bottom of Food</li><li><b>Coach, reminders, equipment, gym, home gear:</b> Me</li></ul>That's it. Have a great workout!`}
 ];
-function tourDone(){try{return localStorage.getItem('pf-tour')==='1'}catch(e){return !!S.ui.tourSeen}}
-function tourMark(){S.ui.tourSeen=true;try{localStorage.setItem('pf-tour','1')}catch(e){}}
+function tourDone(){try{return localStorage.getItem((window.PF_LS?window.PF_LS+'-tour':'pf-tour'))==='1'}catch(e){return !!S.ui.tourSeen}}
+function tourMark(){S.ui.tourSeen=true;try{localStorage.setItem((window.PF_LS?window.PF_LS+'-tour':'pf-tour'),'1')}catch(e){}}
 function startTour(){S.ui.tour=0;S.ui.tourSlide=S.ui.slide||0;showTour()}
 function endTour(){const t=$('#tour');if(t)t.remove();S.ui.tour=null;tourMark();if(S.ui.tourSlide!=null){S.ui.slide=S.ui.tourSlide;S.ui.tourSlide=null;if(S.ui.view==='today')render()}refreshAds()}
 /* The highlighted thing on screen: the first match that's actually visible (cards scroll sideways). */
@@ -6323,7 +6415,7 @@ function renderOnboard(){
   else if(st===6){inner=renderFastStep(d)}
   else{
     const on=DAYS.filter(x=>d.days[x]>0),tot=on.reduce((a,x)=>a+d.days[x],0);ok=on.length>0;
-    const gyms=['pf','af','hf','other','home'];
+    const gyms=partner()?['other','home']:['pf','af','hf','other','home'];
     inner=`<div class="eyebrow">Step 4 of 7</div><h1>Where and when will you train?</h1>
       <div class="eyebrow" style="margin-top:6px">Where</div>
       <div class="chips">${gyms.map(k=>`<button class="chip ${d.gym===k?'on':''}" data-act="gympick" data-v="${k}" aria-pressed="${d.gym===k}">${k==='home'?'At home (no gym)':CHAINS[k].n}</button>`).join('')}</div>
@@ -6719,6 +6811,11 @@ document.addEventListener('click',e=>{
     case 'mctl':Native.control(v);if(MEDIA&&v==='toggle'){MEDIA.playing=!MEDIA.playing;drawMusic()}break;
     case 'mopenpkg':if(MEDIA&&MEDIA.pkg)Native.openApp(MEDIA.pkg);break;
     case 'ovclose':closeOv();break;
+    case 'hrhigh':openHrHigh(b.dataset.id,'1');break;
+    case 'hrlvl':openHrHigh(b.dataset.id,v);break;
+    case 'gymday':{const g=gymState();g.day=v;gymPut(g);render();break}
+    case 'gymall':{const g=gymState();g.all=!!+v;gymPut(g);render();break}
+    case 'gymres':{const g=gymState();g.res=g.res||{};if(g.res[v]){delete g.res[v];toast('Spot cancelled')}else{g.res[v]=1;toast('Spot saved'+(partner()&&partner().demo?' (demo: saved on this phone only)':''))}gymPut(g);render();break}
     case 'view':S.ui.view=v;render();$('.floor').scrollTop=0;break;
     case 'pickday':S.ui.day=+v;S.ui.slide=0;render();break;
     case 'goday':S.ui.day=+v;S.ui.slide=0;S.ui.view='today';render();$('.floor').scrollTop=0;break;
@@ -6925,7 +7022,7 @@ setTimeout(initDb,0);
 
 <script>
 (function(){try{
- if(!WEBSITE)return;const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+ if(!WEBSITE||window.PF_PARTNER)return;const ios=/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
  const standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
  if(!ios||standalone)return;try{if(localStorage.getItem('pf-a2hs'))return}catch(_){}
  const d=document.createElement('div');d.id='a2hs';
