@@ -5097,7 +5097,7 @@ function renderFood(){
   const {C:CY}=cycleDay(p,G,dk);const tripToday=CY.trips.find(t=>t.date===dk);
   const head=`<div class="dayhead"><div class="eyebrow">${PL}-day plan ${monthOf(p,dk)+1} · day ${dayIdx+1} of ${PL}${dk===today?' · today':''}${isFastDay(p,dk)?' · fasting day':''}</div>
     <div class="fnav"><button class="btn" data-act="fday" data-v="-1" aria-label="Previous day">‹</button><h2>${new Date(dk+'T12:00').toLocaleDateString(undefined,{weekday:'long',month:'short',day:'numeric'})}</h2><button class="btn" data-act="fday" data-v="1" aria-label="Next day">›</button></div>
-    <div class="chips">${!p.hideCal?`<span class="chip">${dayKcal(p,G,dk)} kcal target</span>`:''}<span class="chip">${G.protein} g protein</span>${dietsOn(p,dk)[0]!=='all'?`<span class="chip on">${dietsOn(p,dk).map(x=>DIET_NAME[x]).join(' + ')}${p.dietMode==='rotate'&&dietsOf(p).length>1?' today':''}</span>`:''}${p.dia!=='none'&&p.dia?'<span class="chip on">Diabetes-friendly</span>':''}${(p.alg||[]).length?`<span class="chip">No ${(p.alg||[]).map(a=>ALG[a].toLowerCase()).join(', ')}</span>`:''}${dk!==today?`<button class="chip" data-act="ftoday">Back to today</button>`:''}<button class="chip" data-act="shop">Shopping list</button><button class="chip" data-act="rxpick">Recipe picker</button><button class="chip" data-act="shoptab" data-v="supp">Supplements</button></div></div>`;
+    <div class="chips">${!p.hideCal?`<span class="chip">${dayKcal(p,G,dk)} kcal target</span>`:''}<span class="chip">${G.protein} g protein</span>${dietsOn(p,dk)[0]!=='all'?`<span class="chip on">${dietsOn(p,dk).map(x=>DIET_NAME[x]).join(' + ')}${p.dietMode==='rotate'&&dietsOf(p).length>1?' today':''}</span>`:''}${p.dia!=='none'&&p.dia?'<span class="chip on">Diabetes-friendly</span>':''}${(p.alg||[]).length?`<span class="chip">No ${(p.alg||[]).map(a=>ALG[a].toLowerCase()).join(', ')}</span>`:''}${dk!==today?`<button class="chip" data-act="ftoday">Back to today</button>`:''}<button class="chip" data-act="shop">Shopping list</button><button class="chip" data-act="rxpick">Recipe picker</button><button class="chip" data-act="shoptab" data-v="supp">Supplements</button><button class="chip" data-act="editfood">Allergies &amp; diet</button></div></div>`;
   const notes=[];
   if(inDietBreak(p,dk))notes.push(`Diet break day: eat about ${dietBreakKcal(p)} kcal more than the plan below. Easy ways: have both snacks plus an extra one, or 1½ portions at lunch and dinner. You're back on plan ${fmtD(addDays(p.dietBreak.to,1))}.`);
   if(p.dia&&p.dia!=='none')notes.push('Diabetes: carbs are spread evenly across meals. Check your glucose before and after the gym. If it is under 100 mg/dL before exercise, have a 15 g carb snack first. If it is over 250 mg/dL with ketones, skip the workout. Follow your care team\'s targets over this plan.');
@@ -6096,7 +6096,7 @@ function renderMe(){
       ${isHome(p)?'':`<div class="eyebrow" style="margin-top:6px">Equipment</div><div class="seg" style="align-self:flex-start;margin:4px 0">${LIFT_OPTS.map(o=>`<button data-act="lift" data-v="${o[0]}" class="${liftOf(p)===o[0]?'on':''}">${o[1]}</button>`).join('')}</div>
       <p class="how muted" style="font-size:13px;margin:0 0 8px">${LIFT_WHY[liftOf(p)]}</p>`}${Object.keys(p.swaps||{}).length?`<p class="how">${Object.keys(p.swaps).length} exercise swap${Object.keys(p.swaps).length>1?'s':''} saved. <button class="linkbtn" data-act="clearswaps">Reset swaps</button></p>`:''}<div><button class="btn" data-act="redo">Change gym or home</button></div></div>
     <div class="card"><h3>Settings</h3>
-      <div class="chips"><button class="btn" data-act="tourstart">Take the tour</button><button class="btn" data-act="backup">Back up</button><button class="btn" data-act="restore1">Restore</button><button class="btn" data-act="redo">Redo setup</button>
+      <div class="chips"><button class="btn" data-act="tourstart">Take the tour</button><button class="btn" data-act="backup">Back up</button><button class="btn" data-act="restore1">Restore</button><button class="btn" data-act="editfood">Allergies &amp; diet</button><button class="btn" data-act="redo">Redo setup</button>
       ${S.ui.confirmReset?`<span class="confirm"><span class="muted">Erase all logged sets?</span><button class="btn" style="border-color:var(--bad);color:var(--bad)" data-act="reset2">Erase history</button><button class="btn ghost" data-act="reset0">Cancel</button></span>`:`<button class="btn ghost" data-act="reset1">Clear workout history</button>`}</div></div>`;
 }
 
@@ -6347,8 +6347,8 @@ function renderOnboard(){
       <div class="note" id="totline"><b>${on.length} day${on.length===1?'':'s'}</b> · <b>${(tot/60).toFixed(1)} hours</b> a week</div>${on.length===7?'<p class="how" style="font-size:13px;margin:6px 0 0">Training every day works: the plan rotates push, pull and legs twice, plus a cardio day, so each muscle group gets at least 2 days to recover. On days you feel run down, an easy walk counts.</p>':''}`;
   }
   return `<div class="floor"><div class="ob gut">${prog}${inner}
-    <div class="obnav">${S.ui.daysOnly?`<button class="btn ghost" data-act="obcancel">Cancel</button>`:st>0?`<button class="btn" data-act="obback">Back</button>`:(S.profile?`<button class="btn ghost" data-act="obcancel">Cancel</button>`:'<span></span>')}
-      <button class="btn primary" data-act="obnext" ${ok?'':'disabled'}>${S.ui.daysOnly?'Save schedule':st===6?'Build my plan':'Next'}</button></div></div></div>`;
+    <div class="obnav">${S.ui.daysOnly||S.ui.foodOnly?`<button class="btn ghost" data-act="obcancel">Cancel</button>`:st>0?`<button class="btn" data-act="obback">Back</button>`:(S.profile?`<button class="btn ghost" data-act="obcancel">Cancel</button>`:'<span></span>')}
+      <button class="btn primary" data-act="obnext" ${ok?'':'disabled'}>${S.ui.daysOnly?'Save schedule':S.ui.foodOnly?'Save':st===6?'Build my plan':'Next'}</button></div></div></div>`;
 }
 
 
@@ -6852,14 +6852,16 @@ document.addEventListener('click',e=>{
       S.wt=(S.wt||[]).filter(x=>x.d!==todayKey());S.wt.push({d:todayKey(),w});save('wt',true);toast('Weigh-in saved');render();break}
     case 'editdays':S.ui.draft=newDraft();S.ui.step=3;S.ui.daysOnly=true;render();$('.floor').scrollTop=0;break;
     case 'editgoal':S.ui.draft=newDraft();S.ui.step=3;render();break;
+    case 'editfood':S.ui.draft=newDraft();S.ui.step=5;S.ui.foodOnly=true;render();$('.floor').scrollTop=0;break;
     case 'gogoal':S.ui.view='goal';render();$('.floor').scrollTop=0;break;
     case 'dayset':{const d=S.ui.draft;if(!d)break;const pick={all:DAYS,wk:['mon','tue','wed','thu','fri'],mwf:['mon','wed','fri'],none:[]}[v]||[];
       const mins=+(($('#f-all')||{}).value)||DAYS.map(x=>d.days[x]).find(m=>m>0)||60;DAYS.forEach(x=>{d.days[x]=pick.includes(x)?(d.days[x]>0?d.days[x]:mins):0});render();break}
     case 'tday':d.days[v]=d.days[v]>0?0:(+$('#f-all').value||60);render();break;
     case 'obback':S.ui.step--;render();$('.floor').scrollTop=0;break;
-    case 'obcancel':S.ui.draft=null;S.ui.step=0;S.ui.daysOnly=false;render();break;
+    case 'obcancel':S.ui.draft=null;S.ui.step=0;S.ui.daysOnly=false;S.ui.foodOnly=false;render();break;
     case 'obnext':
       if(S.ui.daysOnly){S.ui.daysOnly=false;S.ui.savingDays=true;S.ui.step=6}
+      if(S.ui.foodOnly){S.ui.foodOnly=false;S.ui.savingFood=true;S.ui.step=6}
       if(S.ui.step<6){S.ui.step++;if(S.ui.step===4&&!d.goalWset)d.goalW=suggestGoalW(Object.assign({},d,{goalW:0}));render();$('.floor').scrollTop=0}
       else{const p=Object.assign({},d);p.age=+p.age;p.weight=+p.weight;p.rest=+p.rest||0;p.mhr=(m=>m>=100&&m<=220?m:0)(Math.round(+p.mhr||0));p.fem=!!p.fem;p.music=p.music||'spotify';
         p.goalW=clampGoalW(p,+p.goalW||suggestGoalW(p));
@@ -6867,7 +6869,7 @@ document.addEventListener('click',e=>{
         if(p.ed)p.hideCal=true;p.v=2;
         const old=S.profile;if(!old||!old.v||old.goal!==p.goal||old.goalW!==p.goalW)p.start=todayKey();else p.start=old.start||todayKey();
         if(!old||!old.v)p.builtAt=Date.now();else{p.builtAt=old.builtAt;['coach','coachSet','coachTough','notif'].forEach(k=>{if(old[k]!==undefined)p[k]=old[k]})}
-        const wasDays=S.ui.savingDays;S.ui.upgrade=false;S.profile=p;S.ui.draft=null;S.ui.step=0;S.ui.view=wasDays?'week':'today';S.ui.day=null;S.ui.savingDays=false;save('profile',true);render();toast(wasDays?'Schedule saved':'Plan built')}
+        const wasDays=S.ui.savingDays;S.ui.upgrade=false;S.profile=p;S.ui.draft=null;S.ui.step=0;const wasFood=S.ui.savingFood;S.ui.savingFood=false;S.ui.view=wasDays?'week':wasFood?'food':'today';S.ui.day=null;S.ui.savingDays=false;save('profile',true);render();toast(wasDays?'Schedule saved':wasFood?'Food settings saved':'Plan built')}
       break;
   }
 });
